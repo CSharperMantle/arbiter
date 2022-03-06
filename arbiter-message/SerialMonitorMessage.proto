@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+/*
+ * A message sent by Monitor to Host via a Serial cable/port.
+ */
+message SerialMonitorMessage {
+  enum Type {
+    QUERY_REQUEST = 0;  // A Query to Host for connected Clients.
+    RESET_REQUEST = 1;  // Command the Host to reset Clients.
+  }
+  Type type = 1;  // The message type.
+}

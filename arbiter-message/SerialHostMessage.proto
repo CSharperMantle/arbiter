@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+import "ClientInfo.proto";
+
+/*
+ * A list of clients.
+ */
+message ClientsList {
+  repeated ClientInfo client_info = 1;
+}
+
+/*
+ * A message sent by Host to Monitor via a Serial cable/port.
+ */
+message SerialHostMessage {
+  enum Type {
+    QUERY_CONFIRMATION = 0;  // A reply to a Query message.
+    RESET_CONFIRMATION = 1;  // A reply to a Reset message.
+    ARBITRATION_DONE = 2;  // A message to indicate a settled arbitration.
+  }
+  Type type = 1;  // The message type.
+  
+  oneof content {
+    ClientsList clients = 2;  // The result sent with QUERY_CONFIRMATION.
+    ClientInfo arbitration = 3;  // The result sent with ARBITRATION_DONE.
+  }
+}

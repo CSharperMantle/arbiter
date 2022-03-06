@@ -1,0 +1,10 @@
+syntax = "proto3";
+
+/*
+ * Represent a general Client and its relevant information.
+ */
+message ClientInfo {
+  fixed32 address_ipv4 = 1;  // The intranet address.
+  uint32 id = 2;  // The ID.
+  uint32 latency = 3;  // The ping latency in millisec and rounded.
+}

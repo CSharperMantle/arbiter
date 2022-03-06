@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+import "ClientInfo.proto";
+
+/*
+ * A message sent by Client to Host via wireless connection.
+ */
+message WirelessClientMessage {
+  enum Type {
+    PONG = 0;  // A reply to a Ping message.
+    HANDSHAKE_ASSIGNMENT_CONFIRMATION = 1;  // An acknowledge to an Assignment message in Handshake.
+    RESET_CONFIRMATION = 2;  // A confirmation of a successful Reset.
+    HANDSHAKE_REQUEST = 3;  // A request to initiate a handshake.
+    ARBITRATION_REQUEST = 4;  // A request to arbitrate.
+  }
+  Type type = 1;  // The message type.
+
+  oneof content {
+    ClientInfo assignment = 2;  // The assignment to be acknowledged.
+  }
+}
