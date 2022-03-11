@@ -1,5 +1,3 @@
-syntax = "proto3";
-
 /*
  * The MIT License (MIT)
  *
@@ -22,14 +20,22 @@ syntax = "proto3";
  * OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  *
-
-/*
- * A message sent by Monitor to Host via a Serial cable/port.
  */
-message SerialMonitorMessage {
-  enum Type {
-    QUERY_REQUEST = 0;  // A Query to Host for connected Clients.
-    RESET_REQUEST = 1;  // Command the Host to reset Clients.
-  }
-  Type type = 1;  // The message type.
+
+#include <Arduino.h>
+#include <vector>
+#include <algorithm>
+
+void setup() {
+  Serial.begin(115200);
+  
+  std::vector<int> v {1, 2, 3, 4, 5};
+  v.push_back(6);
+  std::for_each(v.cbegin(), v.cend(), [](const int i){
+    Serial.println(i);
+  });
+}
+
+void loop() {
+
 }
