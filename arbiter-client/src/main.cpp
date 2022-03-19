@@ -22,6 +22,8 @@
  *
  */
 
+#include <cstdint>
+#include <cstring>
 #include <Arduino.h>
 #include <FreeRTOS.h>
 #include <WiFi.h>
@@ -32,13 +34,18 @@
 #include "WirelessClientMessage.pb.h"
 #include "WirelessHostMessage.pb.h"
 
-static const uint32_t BUFFER_SIZE = 512;
-static const uint32_t QUEUE_SIZE = 10;
+/* == CONSTS == */
 
-static const char *WIFI_SSID = "[REPLACE_ME]";
-static const char *WIFI_PASS = "[REPLACE_ME]";
-static const uint16_t HOST_UDP_PORT = 10010;
-static const uint16_t HOST_TCP_PORT = 10011;
+static const std::uint32_t BUFFER_SIZE = 512u;
+static const std::uint32_t QUEUE_SIZE = 10u;
+
+static const char *WIFI_SSID = "302";
+static const char *WIFI_PASS = "^97Y3S8qht$97534";
+static const std::uint16_t HOST_UDP_PORT = 10010u;
+static const std::uint16_t HOST_TCP_PORT = 10011u;
+static const std::uint16_t CLIENT_UDP_PORT = 10012u;
+
+/* == GLOBAL OBJECTS == */
 
 static WiFiClient client{};
 static WiFiUDP udp{};
@@ -46,20 +53,43 @@ static WiFiUDP udp{};
 /**
  * \brief Runtime-editable system config.
  */
-struct SystemConfig
+static struct SystemConfig
 {
-  uint32_t id = static_cast<uint32_t>(-1);
-  IPAddress local_ip{static_cast<uint32_t>(-1)};
-  IPAddress host_ip{static_cast<uint32_t>(-1)};
-};
-static SystemConfig system_config{};
+  uint32_t id = static_cast<std::uint32_t>(-1);
+  IPAddress local_ip{0u};
+  IPAddress host_ip{0u};
+  IPAddress subnet_mask{0u};
+} system_config{};
 
-static uint8_t incoming_queue_storage[QUEUE_SIZE * sizeof(WirelessHostMessage)];
+/* == HANDLES == */
+
+static std::uint8_t incoming_queue_storage[QUEUE_SIZE * sizeof(WirelessHostMessage)];
 static StaticQueue_t incoming_queue{};
-static QueueHandle_t incoming_queue_handle = nullptr;
-static uint8_t outgoing_queue_storage[QUEUE_SIZE * sizeof(WirelessClientMessage)];
+static QueueHandle_t incoming_queue_handle = nullptr; // Incoming packet queue.
+static std::uint8_t outgoing_queue_storage[QUEUE_SIZE * sizeof(WirelessClientMessage)];
 static StaticQueue_t outgoing_queue{};
-static QueueHandle_t outgoing_queue_handle = nullptr;
+static QueueHandle_t outgoing_queue_handle = nullptr; // Outgoing packet queue.
+
+static TaskHandle_t task_wifi_read_handle = nullptr;
+
+/* == HELPERS == */
+
+static constexpr std::uint32_t helper_get_broadcast_address(const std::uint32_t ip,
+                                                            const std::uint32_t mask) noexcept
+{
+  return ip | ~mask;
+}
+
+static inline void helper_print_byte_array(const std::uint8_t array[], const std::uint32_t size) noexcept
+{
+  for (std::uint32_t i = 0u; i < size; ++i)
+  {
+    printf("%02X ", array[i]);
+  }
+  printf("\n");
+}
+
+/* == ACTIONS (SUBROUTINES) == */
 
 /**
  * \brief Initialize all peripherals.
@@ -68,22 +98,26 @@ static QueueHandle_t outgoing_queue_handle = nullptr;
  */
 static void action_init_periph()
 {
-  printf("Initializing peripherals...\n");
+  printf("i: Initializing peripherals...\n");
 
   WiFi.begin(WIFI_SSID, WIFI_PASS);
   while (WiFi.status() != WL_CONNECTED)
   {
-    delay(500);
+    taskYIELD();
   }
 
   system_config.local_ip = WiFi.localIP();
+  system_config.subnet_mask = WiFi.subnetMask();
 
   printf("i: Connected to %s\n", WIFI_SSID);
   printf("v: MAC address: %s\n", WiFi.macAddress().c_str());
   printf("v: IP address: %s\n", system_config.local_ip.toString().c_str());
-  printf("v: Subnet mask: %s\n", WiFi.subnetMask().toString().c_str());
+  printf("v: Subnet mask: %s\n", system_config.subnet_mask.toString().c_str());
 
-  printf("Peripherals initialized.\n");
+  udp.begin(CLIENT_UDP_PORT);
+  printf("i: UDP listening port: %u\n", CLIENT_UDP_PORT);
+
+  printf("i: Peripherals initialized.\n");
 }
 
 /**
@@ -91,47 +125,51 @@ static void action_init_periph()
  */
 static void action_handshake()
 {
-  printf("i: Handshaking with Host...\n");
+  printf("i: Handshaking with Host.\n");
 
-  // Universal return code container.
-  uint32_t status = 0;
+  std::uint32_t rc = 0; // The return code.
 
-  {
-    // Construct probe message.
-    printf("v: Sending probe to Host...\n");
-    WirelessClientMessage msg{
-        .type = WirelessClientMessage_Type_HANDSHAKE_REQUEST,
-    };
-    uint8_t msg_buffer[BUFFER_SIZE];
-    auto stream = pb_ostream_from_buffer(msg_buffer, sizeof(msg_buffer));
-    status = pb_encode(&stream, WirelessClientMessage_fields, &msg);
-    assert(status);
-
-    // Send probe message via UDP.
-    status = udp.beginPacket(system_config.local_ip, HOST_UDP_PORT);
-    assert(status);
-    status = udp.write(msg_buffer, stream.bytes_written);
-    assert(status == stream.bytes_written);
-    status = udp.endPacket();
-    assert(status);
-  }
-
-  // Wait for the response from the server.
   while (true)
   {
+    printf("v: Probing for Host...\n");
+    WirelessClientMessage msg{};
+    msg.type = WirelessClientMessage_Type_HANDSHAKE_REQUEST;
+
+    std::uint8_t msg_buffer[BUFFER_SIZE];
+    std::memset(msg_buffer, 0, BUFFER_SIZE * sizeof(std::uint8_t));
+    // Pack message.
+    auto stream = pb_ostream_from_buffer(msg_buffer, sizeof(msg_buffer));
+    rc = pb_encode(&stream, WirelessClientMessage_fields, &msg);
+    assert(rc);
+    // Broadcast probe via UDP.
+    rc = udp.beginPacket(helper_get_broadcast_address(static_cast<uint32_t>(system_config.local_ip),
+                                                      static_cast<uint32_t>(system_config.subnet_mask)),
+                         HOST_UDP_PORT);
+    assert(rc);
+    rc = udp.write(msg_buffer, stream.bytes_written);
+    assert(rc == stream.bytes_written);
+    rc = udp.endPacket();
+    assert(rc);
     printf("v: Waiting for handshake response...\n");
-    while (udp.parsePacket() == 0)
+    // Forever loop until we receive any packet.
+    uint32_t packetSize = 0;
+    while (packetSize == 0)
     {
-      delay(1);
+      packetSize = udp.parsePacket();
+      taskYIELD();
     }
-    printf("v: Got a UDP packet.\n");
-    uint8_t response_buffer[BUFFER_SIZE];
+    assert(packetSize);
+
+    std::uint8_t response_buffer[BUFFER_SIZE];
+    std::memset(response_buffer, 0, BUFFER_SIZE * sizeof(std::uint8_t));
+
     udp.readBytes(response_buffer, sizeof(response_buffer));
-    auto istream = pb_istream_from_buffer(response_buffer, sizeof(response_buffer));
+    // Unpack response.
+    auto istream = pb_istream_from_buffer(response_buffer, packetSize);
     WirelessHostMessage response{};
-    status = pb_decode(&istream, WirelessHostMessage_fields, &response);
-    assert(status);
-    if (response.type == WirelessHostMessage_Type_HANDSHAKE_ASSIGNMENT)
+    rc = pb_decode(&istream, WirelessHostMessage_fields, &response);
+
+    if (rc && response.type == WirelessHostMessage_Type_HANDSHAKE_ASSIGNMENT)
     {
       // Assignment answered.
       system_config.host_ip = udp.remoteIP();
@@ -144,35 +182,42 @@ static void action_handshake()
     }
     else
     {
-      printf("v: Not an expected response. \n");
+      // Either the packet is corrupt or another broadcast packet is received.
+      // We just try again.
+      printf("v: Irrelevant UDP packet received. \n");
     }
   }
 
   {
     // Now we need to confirm the handshake.
-    WirelessClientMessage confirmation{
-        .type = WirelessClientMessage_Type_HANDSHAKE_ASSIGNMENT_CONFIRMATION,
-        .which_content = WirelessClientMessage_assignment_tag,
-        .content = {
-            .assignment = {
-                .address_ipv4 = static_cast<uint32_t>(system_config.local_ip),
-                .id = system_config.id,
-            },
-        },
-    };
-    uint8_t confirmation_buffer[BUFFER_SIZE];
+    WirelessClientMessage confirmation{};
+    confirmation.type = WirelessClientMessage_Type_HANDSHAKE_ASSIGNMENT_CONFIRMATION;
+    confirmation.which_content = WirelessClientMessage_assignment_tag;
+    confirmation.content.assignment.address_ipv4 = static_cast<uint32_t>(system_config.local_ip);
+    confirmation.content.assignment.id = system_config.id;
+    std::uint8_t confirmation_buffer[BUFFER_SIZE];
     auto confirmation_stream = pb_ostream_from_buffer(confirmation_buffer, sizeof(confirmation_buffer));
-    status = pb_encode(&confirmation_stream, WirelessClientMessage_fields, &confirmation);
-    assert(status);
+    rc = pb_encode(&confirmation_stream, WirelessClientMessage_fields, &confirmation);
+    assert(rc);
 
     // Send the confirmation.
-    status = udp.beginPacket(system_config.host_ip, HOST_UDP_PORT);
-    assert(status);
-    status = udp.write(confirmation_buffer, confirmation_stream.bytes_written);
-    assert(status == confirmation_stream.bytes_written);
-    status = udp.endPacket();
-    assert(status);
+    rc = udp.beginPacket(system_config.host_ip, HOST_UDP_PORT);
+    assert(rc);
+    rc = udp.write(confirmation_buffer, confirmation_stream.bytes_written);
+    assert(rc == confirmation_stream.bytes_written);
+    rc = udp.endPacket();
+    assert(rc);
     printf("i: Handshake done.\n");
+  }
+
+  {
+    // Establish persistent TCP connection.
+    printf("i: Establishing TCP connection...\n");
+    while (!client.connect(system_config.host_ip, HOST_TCP_PORT, 200))
+    {
+      taskYIELD();
+    }
+    printf("i: TCP connection established.\n");
   }
 }
 
@@ -195,6 +240,48 @@ static void action_init_data_structures()
   printf("i: Data structures initialized.\n");
 }
 
+/* == TASKS (THREAD ENTRY POINTS) == */
+
+/**
+ * \brief Read TCP messages via WiFi from Host.
+ */
+static void task_wifi_read(void *_)
+{
+  uint32_t rc = 0; // The return code.
+  BaseType_t x_rc; // The BaseType_t return code.
+
+  while (true)
+  {
+    // Wait for a packet.
+    while (client.available() == 0)
+    {
+      taskYIELD();
+    }
+
+    // Read the packet.
+    std::uint8_t buffer[BUFFER_SIZE];
+    rc = client.readBytes(buffer, sizeof(buffer));
+    assert(rc);
+    auto istream = pb_istream_from_buffer(buffer, sizeof(buffer));
+    WirelessHostMessage msg{};
+    rc = pb_decode(&istream, WirelessHostMessage_fields, &msg);
+    if (!rc)
+    {
+      printf("w: Failed to decode message.\n");
+      continue;
+    }
+
+    // Send the message to the queue.
+    x_rc = xQueueSendToBack(incoming_queue_handle, &msg, 0);
+    if (x_rc != pdPASS)
+    {
+      printf("w: Packet emplacement failed. Queue possibly full. Packet dropped.\n");
+    }
+  }
+}
+
+/* == MAIN == */
+
 void setup()
 {
   auto app_cpu = xPortGetCoreID();
@@ -203,10 +290,18 @@ void setup()
   action_init_periph();
   action_handshake();
   action_init_data_structures();
+
+  xTaskCreatePinnedToCore(task_wifi_read,
+                          "wifi_read",
+                          2048,
+                          nullptr,
+                          1,
+                          &task_wifi_read_handle,
+                          app_cpu);
 }
 
 void loop()
 {
-  printf("v: Main thread quitting\n");
+  printf("v: Main thread quitting.\n");
   vTaskDelete(nullptr);
 }

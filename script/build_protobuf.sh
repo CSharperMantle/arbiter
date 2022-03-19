@@ -34,6 +34,7 @@ mkdir build
 rm -r build/arbiter-message
 mkdir build/arbiter-message
 mkdir build/arbiter-message/cpp;
+mkdir build/arbiter-message/py;
 mkdir build/arbiter-message/nanopb;
 
 cd arbiter-message;
@@ -42,7 +43,7 @@ do
     if [[ $filename == *.proto ]]
     then
         echo "[INFO] Building $filename with protoc";
-        protoc --cpp_out ./../build/arbiter-message/cpp/ $filename;
+        protoc --cpp_out ./../build/arbiter-message/cpp/ --python_out ./../build/arbiter-message/py/ $filename;
         echo "[INFO] Building $filename with nanopb_generator";
         nanopb_generator --output-dir ./../build/arbiter-message/nanopb/ --quiet $filename;
     fi;
