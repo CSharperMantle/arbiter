@@ -71,6 +71,7 @@ static StaticQueue_t outgoing_queue{};
 static QueueHandle_t outgoing_queue_handle = nullptr; // Outgoing packet queue.
 
 static TaskHandle_t task_wifi_read_handle = nullptr;
+static TaskHandle_t task_wifi_send_handle = nullptr;
 
 /* == HELPERS == */
 
@@ -78,6 +79,20 @@ static constexpr std::uint32_t helper_get_broadcast_address(const std::uint32_t 
                                                             const std::uint32_t mask) noexcept
 {
   return ip | ~mask;
+}
+
+static inline std::uint32_t helper_reverse_bytes(const std::uint32_t x) noexcept
+{
+  int t2 = ~(0xff << 24);
+  int s1 = (0xff << 16) + 0xff;
+  int s2 = 0xff << 8;
+  int s3 = (s2 << 16) + s2;
+  int temp = (x & s1) << 8 | ((x & s3) >> 8 & t2);
+  int q1 = (0xff << 8) + 0xff;
+  int q2 = q1 << 16;
+  int temp2 = (temp & q1) << 16 | ((temp & q2) >> 16 & (~q2));
+
+  return temp2;
 }
 
 static inline void helper_print_byte_array(const std::uint8_t array[], const std::uint32_t size) noexcept
@@ -111,7 +126,7 @@ static void action_init_periph()
 
   printf("i: Connected to %s\n", WIFI_SSID);
   printf("v: MAC address: %s\n", WiFi.macAddress().c_str());
-  printf("v: IP address: %s\n", system_config.local_ip.toString().c_str());
+  printf("v: IP address: %u\n", static_cast<uint32_t>(system_config.local_ip));
   printf("v: Subnet mask: %s\n", system_config.subnet_mask.toString().c_str());
 
   udp.begin(CLIENT_UDP_PORT);
@@ -158,7 +173,6 @@ static void action_handshake()
       packetSize = udp.parsePacket();
       taskYIELD();
     }
-    assert(packetSize);
 
     std::uint8_t response_buffer[BUFFER_SIZE];
     std::memset(response_buffer, 0, BUFFER_SIZE * sizeof(std::uint8_t));
@@ -171,14 +185,26 @@ static void action_handshake()
 
     if (rc && response.type == WirelessHostMessage_Type_HANDSHAKE_ASSIGNMENT)
     {
-      // Assignment answered.
-      system_config.host_ip = udp.remoteIP();
-      system_config.id = response.content.assignment.id;
+      if (response.content.assignment.address_ipv4 == helper_reverse_bytes(
+                                                          static_cast<uint32_t>(system_config.local_ip)))
+      {
+        // Assignment answered.
+        system_config.host_ip = udp.remoteIP();
+        system_config.id = response.content.assignment.id;
 
-      printf("v: Got handshake assignment from Host.\n");
-      printf("i: Assigned ID: %d\n", system_config.id);
-      printf("v: Host: %s\n", system_config.host_ip.toString().c_str());
-      break;
+        printf("v: Got handshake assignment from Host.\n");
+        printf("i: Assigned ID: %d\n", system_config.id);
+        printf("v: Host: %s\n", system_config.host_ip.toString().c_str());
+        break;
+      }
+      else
+      {
+        // The Host has bugs so that it mangles up IP addresses of this
+        // Client. Ignoring the packet.
+        printf("w: Assigned and local IP mismatch (%u != %u). Packet ignored.\n",
+               response.content.assignment.address_ipv4,
+               helper_reverse_bytes(static_cast<uint32_t>(system_config.local_ip)));
+      }
     }
     else
     {
@@ -260,9 +286,9 @@ static void task_wifi_read(void *_)
 
     // Read the packet.
     std::uint8_t buffer[BUFFER_SIZE];
-    rc = client.readBytes(buffer, sizeof(buffer));
-    assert(rc);
-    auto istream = pb_istream_from_buffer(buffer, sizeof(buffer));
+    uint8_t packetSize = client.readBytes(buffer, sizeof(buffer));
+    assert(packetSize);
+    auto istream = pb_istream_from_buffer(buffer, packetSize);
     WirelessHostMessage msg{};
     rc = pb_decode(&istream, WirelessHostMessage_fields, &msg);
     if (!rc)
@@ -272,11 +298,38 @@ static void task_wifi_read(void *_)
     }
 
     // Send the message to the queue.
-    x_rc = xQueueSendToBack(incoming_queue_handle, &msg, 0);
+    x_rc = xQueueSendToBack(incoming_queue_handle, &msg, portMAX_DELAY);
     if (x_rc != pdPASS)
     {
-      printf("w: Packet emplacement failed. Queue possibly full. Packet dropped.\n");
+      printf("w: Packet emplacement failed. Packet dropped.\n");
     }
+  }
+}
+
+/**
+ * \brief Send TCP messages via WiFi to Host.
+ */
+static void task_wifi_send(void *_)
+{
+  uint32_t rc = 0; // The return code.
+  BaseType_t x_rc; // The BaseType_t return code.
+
+  while (true)
+  {
+    // Wait for a message.
+    WirelessClientMessage msg{};
+    x_rc = xQueueReceive(outgoing_queue_handle, &msg, portMAX_DELAY);
+    assert(x_rc == pdPASS);
+
+    // Encode the message.
+    std::uint8_t buffer[BUFFER_SIZE];
+    auto stream = pb_ostream_from_buffer(buffer, sizeof(buffer));
+    rc = pb_encode(&stream, WirelessClientMessage_fields, &msg);
+    assert(rc);
+
+    // Send the message.
+    rc = client.write(buffer, stream.bytes_written);
+    assert(rc == stream.bytes_written);
   }
 }
 
@@ -297,6 +350,13 @@ void setup()
                           nullptr,
                           1,
                           &task_wifi_read_handle,
+                          app_cpu);
+  xTaskCreatePinnedToCore(task_wifi_send,
+                          "wifi_send",
+                          2048,
+                          nullptr,
+                          1,
+                          &task_wifi_send_handle,
                           app_cpu);
 }
 
