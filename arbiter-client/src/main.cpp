@@ -75,26 +75,28 @@ static TaskHandle_t task_wifi_send_handle = nullptr;
 
 /* == HELPERS == */
 
+/**
+ * \brief Get broadcast address for a specific IP address and mask.
+ */
 static constexpr std::uint32_t helper_get_broadcast_address(const std::uint32_t ip,
                                                             const std::uint32_t mask) noexcept
 {
   return ip | ~mask;
 }
 
-static inline std::uint32_t helper_reverse_bytes(const std::uint32_t x) noexcept
+/**
+ * \brief Reverse the byte order of a 32-bit integer.
+ *
+ * \see https://forum.arduino.cc/t/reversed-byte-order/699873/6
+ */
+static constexpr std::uint32_t helper_reverse_bytes(const std::uint32_t x) noexcept
 {
-  int t2 = ~(0xff << 24);
-  int s1 = (0xff << 16) + 0xff;
-  int s2 = 0xff << 8;
-  int s3 = (s2 << 16) + s2;
-  int temp = (x & s1) << 8 | ((x & s3) >> 8 & t2);
-  int q1 = (0xff << 8) + 0xff;
-  int q2 = q1 << 16;
-  int temp2 = (temp & q1) << 16 | ((temp & q2) >> 16 & (~q2));
-
-  return temp2;
+  return static_cast<std::uint32_t>((x & 0xFF) << 24 | ((x >> 8) & 0xFF) << 16 | ((x >> 16) & 0xFF) << 8 | ((x >> 24) & 0xFF));
 }
 
+/**
+ * \brief Print an array of bytes in HEX to console.
+ */
 static inline void helper_print_byte_array(const std::uint8_t array[], const std::uint32_t size) noexcept
 {
   for (std::uint32_t i = 0u; i < size; ++i)
@@ -126,7 +128,7 @@ static void action_init_periph()
 
   printf("i: Connected to %s\n", WIFI_SSID);
   printf("v: MAC address: %s\n", WiFi.macAddress().c_str());
-  printf("v: IP address: %u\n", static_cast<uint32_t>(system_config.local_ip));
+  printf("v: IP address: %s\n", system_config.local_ip.toString().c_str());
   printf("v: Subnet mask: %s\n", system_config.subnet_mask.toString().c_str());
 
   udp.begin(CLIENT_UDP_PORT);
@@ -185,8 +187,9 @@ static void action_handshake()
 
     if (rc && response.type == WirelessHostMessage_Type_HANDSHAKE_ASSIGNMENT)
     {
-      if (response.content.assignment.address_ipv4 == helper_reverse_bytes(
-                                                          static_cast<uint32_t>(system_config.local_ip)))
+      //HACK: We need to reverse the endianness of local IP to match that of received IP.
+      std::uint32_t reversed_local_ip = helper_reverse_bytes(static_cast<std::uint32_t>(system_config.local_ip));
+      if (response.content.assignment.address_ipv4 == reversed_local_ip)
       {
         // Assignment answered.
         system_config.host_ip = udp.remoteIP();
@@ -203,7 +206,7 @@ static void action_handshake()
         // Client. Ignoring the packet.
         printf("w: Assigned and local IP mismatch (%u != %u). Packet ignored.\n",
                response.content.assignment.address_ipv4,
-               helper_reverse_bytes(static_cast<uint32_t>(system_config.local_ip)));
+               reversed_local_ip);
       }
     }
     else
