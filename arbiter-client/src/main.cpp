@@ -39,11 +39,13 @@
 static const std::uint32_t BUFFER_SIZE = 512u;
 static const std::uint32_t QUEUE_SIZE = 10u;
 
-static const char *WIFI_SSID = "302";
-static const char *WIFI_PASS = "^97Y3S8qht$97534";
+// static const char *WIFI_SSID = "302";
+// static const char *WIFI_PASS = "^97Y3S8qht$97534";
+static const char *WIFI_SSID = "cisco_3";
+static const char *WIFI_PASS = "xiaoshiwuxian";
 static const std::uint16_t HOST_UDP_PORT = 10010u;
 static const std::uint16_t HOST_TCP_PORT = 10011u;
-static const std::uint16_t CLIENT_UDP_PORT = 10012u;
+static const std::uint16_t CLIENT_UDP_PORT = 10010u;
 
 /* == GLOBAL OBJECTS == */
 
