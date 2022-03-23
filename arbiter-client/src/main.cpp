@@ -47,6 +47,8 @@ static const std::uint16_t HOST_UDP_PORT = 10010u;
 static const std::uint16_t HOST_TCP_PORT = 10011u;
 static const std::uint16_t CLIENT_UDP_PORT = 10010u;
 
+static const std::uint8_t GPIO_ONBOARD_LED = LED_BUILTIN;
+
 /* == GLOBAL OBJECTS == */
 
 static WiFiClient client{};
@@ -74,6 +76,7 @@ static QueueHandle_t outgoing_queue_handle = nullptr; // Outgoing packet queue.
 
 static TaskHandle_t task_wifi_read_handle = nullptr;
 static TaskHandle_t task_wifi_send_handle = nullptr;
+static TaskHandle_t task_message_processor_handle = nullptr;
 
 /* == HELPERS == */
 
@@ -118,6 +121,10 @@ static inline void helper_print_byte_array(const std::uint8_t array[], const std
 static void action_init_periph()
 {
   printf("i: Initializing peripherals...\n");
+
+  pinMode(GPIO_ONBOARD_LED, OUTPUT);
+  // Indicate that we are initializing.
+  digitalWrite(GPIO_ONBOARD_LED, HIGH);
 
   WiFi.begin(WIFI_SSID, WIFI_PASS);
   while (WiFi.status() != WL_CONNECTED)
@@ -189,7 +196,7 @@ static void action_handshake()
 
     if (rc && response.type == WirelessHostMessage_Type_HANDSHAKE_ASSIGNMENT)
     {
-      //HACK: We need to reverse the endianness of local IP to match that of received IP.
+      // HACK: We need to reverse the endianness of local IP to match that of received IP.
       std::uint32_t reversed_local_ip = helper_reverse_bytes(static_cast<std::uint32_t>(system_config.local_ip));
       if (response.content.assignment.address_ipv4 == reversed_local_ip)
       {
@@ -271,6 +278,22 @@ static void action_init_data_structures()
   printf("i: Data structures initialized.\n");
 }
 
+/**
+ * \brief Respond Ping with a Pong.
+ */
+static void action_pong()
+{
+  // std::uint32_t rc = 0; // The return code.
+  BaseType_t x_rc = 0; // The BaseType_t return code.
+
+  WirelessClientMessage pong_msg{};
+  pong_msg.type = WirelessClientMessage_Type_PONG;
+
+  // Send message.
+  x_rc = xQueueSendToBack(outgoing_queue_handle, &pong_msg, portMAX_DELAY);
+  assert(x_rc == pdTRUE);
+}
+
 /* == TASKS (THREAD ENTRY POINTS) == */
 
 /**
@@ -284,11 +307,12 @@ static void task_wifi_read(void *_)
   while (true)
   {
     // Wait for a packet.
-    while (client.available() == 0)
+    while (!client.available())
     {
       taskYIELD();
     }
 
+    printf("i: Decoding incoming packet...\n");
     // Read the packet.
     std::uint8_t buffer[BUFFER_SIZE];
     uint8_t packetSize = client.readBytes(buffer, sizeof(buffer));
@@ -325,6 +349,7 @@ static void task_wifi_send(void *_)
     WirelessClientMessage msg{};
     x_rc = xQueueReceive(outgoing_queue_handle, &msg, portMAX_DELAY);
     assert(x_rc == pdPASS);
+    printf("i: Sending outgoing packet...\n");
 
     // Encode the message.
     std::uint8_t buffer[BUFFER_SIZE];
@@ -338,10 +363,37 @@ static void task_wifi_send(void *_)
   }
 }
 
+/**
+ * \brief Process each incoming message.
+ */
+static void task_message_processor(void *_)
+{
+  // std::uint32_t rc = 0; // The return code.
+  BaseType_t x_rc; // The BaseType_t return code.
+
+  while (true)
+  {
+    WirelessHostMessage incoming_message{};
+    x_rc = xQueueReceive(incoming_queue_handle, &incoming_message, portMAX_DELAY);
+    assert(x_rc == pdPASS);
+    printf("i: Processing incoming message...\n");
+
+    switch (incoming_message.type)
+    {
+    case WirelessHostMessage_Type_PING:
+      action_pong();
+      break;
+    default:
+      break;
+    }
+  }
+}
 /* == MAIN == */
 
 void setup()
 {
+  BaseType_t x_rc; // The BaseType_t return code.
+
   auto app_cpu = xPortGetCoreID();
   printf("v: User code running on CPU %d\n", app_cpu);
 
@@ -349,24 +401,40 @@ void setup()
   action_handshake();
   action_init_data_structures();
 
-  xTaskCreatePinnedToCore(task_wifi_read,
-                          "wifi_read",
-                          2048,
-                          nullptr,
-                          1,
-                          &task_wifi_read_handle,
-                          app_cpu);
-  xTaskCreatePinnedToCore(task_wifi_send,
-                          "wifi_send",
-                          2048,
-                          nullptr,
-                          1,
-                          &task_wifi_send_handle,
-                          app_cpu);
+  x_rc = xTaskCreatePinnedToCore(task_wifi_read,
+                                 "wifi_read",
+                                 2048,
+                                 nullptr,
+                                 1,
+                                 &task_wifi_read_handle,
+                                 app_cpu);
+  assert(x_rc == pdPASS);
+  assert(task_wifi_read_handle);
+  x_rc = xTaskCreatePinnedToCore(task_wifi_send,
+                                 "wifi_send",
+                                 2048,
+                                 nullptr,
+                                 1,
+                                 &task_wifi_send_handle,
+                                 app_cpu);
+  assert(x_rc == pdPASS);
+  assert(task_wifi_send_handle);
+  x_rc = xTaskCreatePinnedToCore(task_message_processor,
+                                 "message_processor",
+                                 2048,
+                                 nullptr,
+                                 1,
+                                 &task_message_processor_handle,
+                                 app_cpu);
+  assert(x_rc == pdPASS);
+  assert(task_message_processor_handle);
+
+  // Indicate that we have finished initialization.
+  digitalWrite(GPIO_ONBOARD_LED, LOW);
 }
 
 void loop()
 {
-  printf("v: Main thread quitting.\n");
+  printf("i: Setup done. Main thread quitting.\n");
   vTaskDelete(nullptr);
 }

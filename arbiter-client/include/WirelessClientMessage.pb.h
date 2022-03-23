@@ -12,11 +12,12 @@
 
 /* Enum definitions */
 typedef enum _WirelessClientMessage_Type { 
-    WirelessClientMessage_Type_PONG = 0, 
-    WirelessClientMessage_Type_HANDSHAKE_ASSIGNMENT_CONFIRMATION = 1, 
-    WirelessClientMessage_Type_RESET_CONFIRMATION = 2, 
-    WirelessClientMessage_Type_HANDSHAKE_REQUEST = 3, 
-    WirelessClientMessage_Type_ARBITRATION_REQUEST = 4 
+    WirelessClientMessage_Type_NONE_ = 0, 
+    WirelessClientMessage_Type_PONG = 1, 
+    WirelessClientMessage_Type_HANDSHAKE_ASSIGNMENT_CONFIRMATION = 2, 
+    WirelessClientMessage_Type_RESET_CONFIRMATION = 3, 
+    WirelessClientMessage_Type_HANDSHAKE_REQUEST = 4, 
+    WirelessClientMessage_Type_ARBITRATION_REQUEST = 5 
 } WirelessClientMessage_Type;
 
 /* Struct definitions */
@@ -31,7 +32,7 @@ typedef struct _WirelessClientMessage {
 
 
 /* Helper constants for enums */
-#define _WirelessClientMessage_Type_MIN WirelessClientMessage_Type_PONG
+#define _WirelessClientMessage_Type_MIN WirelessClientMessage_Type_NONE_
 #define _WirelessClientMessage_Type_MAX WirelessClientMessage_Type_ARBITRATION_REQUEST
 #define _WirelessClientMessage_Type_ARRAYSIZE ((WirelessClientMessage_Type)(WirelessClientMessage_Type_ARBITRATION_REQUEST+1))
 

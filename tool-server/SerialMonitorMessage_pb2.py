@@ -14,7 +14,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x1aSerialMonitorMessage.proto\"n\n\x14SerialMonitorMessage\x12(\n\x04type\x18\x01 \x01(\x0e\x32\x1a.SerialMonitorMessage.Type\",\n\x04Type\x12\x11\n\rQUERY_REQUEST\x10\x00\x12\x11\n\rRESET_REQUEST\x10\x01\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x1aSerialMonitorMessage.proto\"y\n\x14SerialMonitorMessage\x12(\n\x04type\x18\x01 \x01(\x0e\x32\x1a.SerialMonitorMessage.Type\"7\n\x04Type\x12\t\n\x05NONE_\x10\x00\x12\x11\n\rQUERY_REQUEST\x10\x01\x12\x11\n\rRESET_REQUEST\x10\x02\x62\x06proto3')
 
 
 
@@ -31,7 +31,7 @@ if _descriptor._USE_C_DESCRIPTORS == False:
 
   DESCRIPTOR._options = None
   _SERIALMONITORMESSAGE._serialized_start=30
-  _SERIALMONITORMESSAGE._serialized_end=140
+  _SERIALMONITORMESSAGE._serialized_end=151
   _SERIALMONITORMESSAGE_TYPE._serialized_start=96
-  _SERIALMONITORMESSAGE_TYPE._serialized_end=140
+  _SERIALMONITORMESSAGE_TYPE._serialized_end=151
 # @@protoc_insertion_point(module_scope)

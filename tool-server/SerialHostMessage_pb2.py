@@ -15,7 +15,7 @@ _sym_db = _symbol_database.Default()
 import ClientInfo_pb2 as ClientInfo__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x17SerialHostMessage.proto\x1a\x10\x43lientInfo.proto\"/\n\x0b\x43lientsList\x12 \n\x0b\x63lient_info\x18\x01 \x03(\x0b\x32\x0b.ClientInfo\"\xd8\x01\n\x11SerialHostMessage\x12%\n\x04type\x18\x01 \x01(\x0e\x32\x17.SerialHostMessage.Type\x12\x1f\n\x07\x63lients\x18\x02 \x01(\x0b\x32\x0c.ClientsListH\x00\x12\"\n\x0b\x61rbitration\x18\x03 \x01(\x0b\x32\x0b.ClientInfoH\x00\"L\n\x04Type\x12\x16\n\x12QUERY_CONFIRMATION\x10\x00\x12\x16\n\x12RESET_CONFIRMATION\x10\x01\x12\x14\n\x10\x41RBITRATION_DONE\x10\x02\x42\t\n\x07\x63ontentb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x17SerialHostMessage.proto\x1a\x10\x43lientInfo.proto\"/\n\x0b\x43lientsList\x12 \n\x0b\x63lient_info\x18\x01 \x03(\x0b\x32\x0b.ClientInfo\"\xe3\x01\n\x11SerialHostMessage\x12%\n\x04type\x18\x01 \x01(\x0e\x32\x17.SerialHostMessage.Type\x12\x1f\n\x07\x63lients\x18\x02 \x01(\x0b\x32\x0c.ClientsListH\x00\x12\"\n\x0b\x61rbitration\x18\x03 \x01(\x0b\x32\x0b.ClientInfoH\x00\"W\n\x04Type\x12\t\n\x05NONE_\x10\x00\x12\x16\n\x12QUERY_CONFIRMATION\x10\x01\x12\x16\n\x12RESET_CONFIRMATION\x10\x02\x12\x14\n\x10\x41RBITRATION_DONE\x10\x03\x42\t\n\x07\x63ontentb\x06proto3')
 
 
 
@@ -42,7 +42,7 @@ if _descriptor._USE_C_DESCRIPTORS == False:
   _CLIENTSLIST._serialized_start=45
   _CLIENTSLIST._serialized_end=92
   _SERIALHOSTMESSAGE._serialized_start=95
-  _SERIALHOSTMESSAGE._serialized_end=311
+  _SERIALHOSTMESSAGE._serialized_end=322
   _SERIALHOSTMESSAGE_TYPE._serialized_start=224
-  _SERIALHOSTMESSAGE_TYPE._serialized_end=300
+  _SERIALHOSTMESSAGE_TYPE._serialized_end=311
 # @@protoc_insertion_point(module_scope)

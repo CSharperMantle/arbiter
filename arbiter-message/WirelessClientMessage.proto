@@ -31,11 +31,12 @@ import "ClientInfo.proto";
  */
 message WirelessClientMessage {
   enum Type {
-    PONG = 0;  // A reply to a Ping message.
-    HANDSHAKE_ASSIGNMENT_CONFIRMATION = 1;  // An acknowledge to an Assignment message in Handshake.
-    RESET_CONFIRMATION = 2;  // A confirmation of a successful Reset.
-    HANDSHAKE_REQUEST = 3;  // A request to initiate a handshake.
-    ARBITRATION_REQUEST = 4;  // A request to arbitrate.
+    NONE_ = 0;  // Placeholder value.
+    PONG = 1;  // A reply to a Ping message.
+    HANDSHAKE_ASSIGNMENT_CONFIRMATION = 2;  // An acknowledge to an Assignment message in Handshake.
+    RESET_CONFIRMATION = 3;  // A confirmation of a successful Reset.
+    HANDSHAKE_REQUEST = 4;  // A request to initiate a handshake.
+    ARBITRATION_REQUEST = 5;  // A request to arbitrate.
   }
   Type type = 1;  // The message type.
 

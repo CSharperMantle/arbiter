@@ -37,9 +37,10 @@ message ClientsList {
  */
 message SerialHostMessage {
   enum Type {
-    QUERY_CONFIRMATION = 0;  // A reply to a Query message.
-    RESET_CONFIRMATION = 1;  // A reply to a Reset message.
-    ARBITRATION_DONE = 2;  // A message to indicate a settled arbitration.
+    NONE_ = 0;  // Placeholder value.
+    QUERY_CONFIRMATION = 1;  // A reply to a Query message.
+    RESET_CONFIRMATION = 2;  // A reply to a Reset message.
+    ARBITRATION_DONE = 3;  // A message to indicate a settled arbitration.
   }
   Type type = 1;  // The message type.
   

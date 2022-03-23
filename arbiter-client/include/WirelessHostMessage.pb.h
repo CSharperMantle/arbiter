@@ -12,10 +12,11 @@
 
 /* Enum definitions */
 typedef enum _WirelessHostMessage_Type { 
-    WirelessHostMessage_Type_PING = 0, 
-    WirelessHostMessage_Type_HANDSHAKE_ASSIGNMENT = 1, 
-    WirelessHostMessage_Type_RESET_REQUEST = 2, 
-    WirelessHostMessage_Type_ARBITRATION_CONFIRMATION = 3 
+    WirelessHostMessage_Type_NONE_ = 0, 
+    WirelessHostMessage_Type_PING = 1, 
+    WirelessHostMessage_Type_HANDSHAKE_ASSIGNMENT = 2, 
+    WirelessHostMessage_Type_RESET_REQUEST = 3, 
+    WirelessHostMessage_Type_ARBITRATION_CONFIRMATION = 4 
 } WirelessHostMessage_Type;
 
 /* Struct definitions */
@@ -30,7 +31,7 @@ typedef struct _WirelessHostMessage {
 
 
 /* Helper constants for enums */
-#define _WirelessHostMessage_Type_MIN WirelessHostMessage_Type_PING
+#define _WirelessHostMessage_Type_MIN WirelessHostMessage_Type_NONE_
 #define _WirelessHostMessage_Type_MAX WirelessHostMessage_Type_ARBITRATION_CONFIRMATION
 #define _WirelessHostMessage_Type_ARRAYSIZE ((WirelessHostMessage_Type)(WirelessHostMessage_Type_ARBITRATION_CONFIRMATION+1))
 

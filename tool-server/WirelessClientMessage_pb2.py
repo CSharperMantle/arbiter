@@ -15,7 +15,7 @@ _sym_db = _symbol_database.Default()
 import ClientInfo_pb2 as ClientInfo__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x1bWirelessClientMessage.proto\x1a\x10\x43lientInfo.proto\"\xf1\x01\n\x15WirelessClientMessage\x12)\n\x04type\x18\x01 \x01(\x0e\x32\x1b.WirelessClientMessage.Type\x12!\n\nassignment\x18\x02 \x01(\x0b\x32\x0b.ClientInfoH\x00\"\x7f\n\x04Type\x12\x08\n\x04PONG\x10\x00\x12%\n!HANDSHAKE_ASSIGNMENT_CONFIRMATION\x10\x01\x12\x16\n\x12RESET_CONFIRMATION\x10\x02\x12\x15\n\x11HANDSHAKE_REQUEST\x10\x03\x12\x17\n\x13\x41RBITRATION_REQUEST\x10\x04\x42\t\n\x07\x63ontentb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x1bWirelessClientMessage.proto\x1a\x10\x43lientInfo.proto\"\xfd\x01\n\x15WirelessClientMessage\x12)\n\x04type\x18\x01 \x01(\x0e\x32\x1b.WirelessClientMessage.Type\x12!\n\nassignment\x18\x02 \x01(\x0b\x32\x0b.ClientInfoH\x00\"\x8a\x01\n\x04Type\x12\t\n\x05NONE_\x10\x00\x12\x08\n\x04PONG\x10\x01\x12%\n!HANDSHAKE_ASSIGNMENT_CONFIRMATION\x10\x02\x12\x16\n\x12RESET_CONFIRMATION\x10\x03\x12\x15\n\x11HANDSHAKE_REQUEST\x10\x04\x12\x17\n\x13\x41RBITRATION_REQUEST\x10\x05\x42\t\n\x07\x63ontentb\x06proto3')
 
 
 
@@ -32,7 +32,7 @@ if _descriptor._USE_C_DESCRIPTORS == False:
 
   DESCRIPTOR._options = None
   _WIRELESSCLIENTMESSAGE._serialized_start=50
-  _WIRELESSCLIENTMESSAGE._serialized_end=291
-  _WIRELESSCLIENTMESSAGE_TYPE._serialized_start=153
-  _WIRELESSCLIENTMESSAGE_TYPE._serialized_end=280
+  _WIRELESSCLIENTMESSAGE._serialized_end=303
+  _WIRELESSCLIENTMESSAGE_TYPE._serialized_start=154
+  _WIRELESSCLIENTMESSAGE_TYPE._serialized_end=292
 # @@protoc_insertion_point(module_scope)

@@ -28,8 +28,9 @@ syntax = "proto3";
  */
 message SerialMonitorMessage {
   enum Type {
-    QUERY_REQUEST = 0;  // A Query to Host for connected Clients.
-    RESET_REQUEST = 1;  // Command the Host to reset Clients.
+    NONE_ = 0;  // Placeholder value.
+    QUERY_REQUEST = 1;  // A Query to Host for connected Clients.
+    RESET_REQUEST = 2;  // Command the Host to reset Clients.
   }
   Type type = 1;  // The message type.
 }

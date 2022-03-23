@@ -15,7 +15,7 @@ _sym_db = _symbol_database.Default()
 import ClientInfo_pb2 as ClientInfo__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x19WirelessHostMessage.proto\x1a\x10\x43lientInfo.proto\"\xc9\x01\n\x13WirelessHostMessage\x12\'\n\x04type\x18\x01 \x01(\x0e\x32\x19.WirelessHostMessage.Type\x12!\n\nassignment\x18\x02 \x01(\x0b\x32\x0b.ClientInfoH\x00\"[\n\x04Type\x12\x08\n\x04PING\x10\x00\x12\x18\n\x14HANDSHAKE_ASSIGNMENT\x10\x01\x12\x11\n\rRESET_REQUEST\x10\x02\x12\x1c\n\x18\x41RBITRATION_CONFIRMATION\x10\x03\x42\t\n\x07\x63ontentb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x19WirelessHostMessage.proto\x1a\x10\x43lientInfo.proto\"\xd4\x01\n\x13WirelessHostMessage\x12\'\n\x04type\x18\x01 \x01(\x0e\x32\x19.WirelessHostMessage.Type\x12!\n\nassignment\x18\x02 \x01(\x0b\x32\x0b.ClientInfoH\x00\"f\n\x04Type\x12\t\n\x05NONE_\x10\x00\x12\x08\n\x04PING\x10\x01\x12\x18\n\x14HANDSHAKE_ASSIGNMENT\x10\x02\x12\x11\n\rRESET_REQUEST\x10\x03\x12\x1c\n\x18\x41RBITRATION_CONFIRMATION\x10\x04\x42\t\n\x07\x63ontentb\x06proto3')
 
 
 
@@ -32,7 +32,7 @@ if _descriptor._USE_C_DESCRIPTORS == False:
 
   DESCRIPTOR._options = None
   _WIRELESSHOSTMESSAGE._serialized_start=48
-  _WIRELESSHOSTMESSAGE._serialized_end=249
+  _WIRELESSHOSTMESSAGE._serialized_end=260
   _WIRELESSHOSTMESSAGE_TYPE._serialized_start=147
-  _WIRELESSHOSTMESSAGE_TYPE._serialized_end=238
+  _WIRELESSHOSTMESSAGE_TYPE._serialized_end=249
 # @@protoc_insertion_point(module_scope)
