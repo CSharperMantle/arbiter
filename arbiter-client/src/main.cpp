@@ -48,6 +48,7 @@ static const std::uint16_t HOST_TCP_PORT = 10011u;
 static const std::uint16_t CLIENT_UDP_PORT = 10010u;
 
 static const std::uint8_t GPIO_ONBOARD_LED = LED_BUILTIN;
+static const std::uint8_t GPIO_MAIN_BUTTON = 0u;
 
 /* == GLOBAL OBJECTS == */
 
@@ -57,13 +58,15 @@ static WiFiUDP udp{};
 /**
  * \brief Runtime-editable system config.
  */
-static struct SystemConfig
+static struct SystemState
 {
   uint32_t id = static_cast<std::uint32_t>(-1);
   IPAddress local_ip{0u};
   IPAddress host_ip{0u};
   IPAddress subnet_mask{0u};
-} system_config{};
+
+  volatile bool main_button_irq_issued = false;
+} system_state{};
 
 /* == HANDLES == */
 
@@ -77,6 +80,7 @@ static QueueHandle_t outgoing_queue_handle = nullptr; // Outgoing packet queue.
 static TaskHandle_t task_wifi_read_handle = nullptr;
 static TaskHandle_t task_wifi_send_handle = nullptr;
 static TaskHandle_t task_message_processor_handle = nullptr;
+static TaskHandle_t task_button_debounced_handle = nullptr;
 
 /* == HELPERS == */
 
@@ -111,6 +115,16 @@ static inline void helper_print_byte_array(const std::uint8_t array[], const std
   printf("\n");
 }
 
+/* == INTERRUPT HANDLERS == */
+
+/**
+ * \brief Button press detection.
+ */
+static void IRAM_ATTR handler_main_button()
+{
+  system_state.main_button_irq_issued = true;
+}
+
 /* == ACTIONS (SUBROUTINES) == */
 
 /**
@@ -125,6 +139,8 @@ static void action_init_periph()
   pinMode(GPIO_ONBOARD_LED, OUTPUT);
   // Indicate that we are initializing.
   digitalWrite(GPIO_ONBOARD_LED, HIGH);
+  pinMode(GPIO_MAIN_BUTTON, INPUT_PULLUP);
+  attachInterrupt(GPIO_MAIN_BUTTON, handler_main_button, FALLING);
 
   WiFi.begin(WIFI_SSID, WIFI_PASS);
   while (WiFi.status() != WL_CONNECTED)
@@ -132,13 +148,13 @@ static void action_init_periph()
     taskYIELD();
   }
 
-  system_config.local_ip = WiFi.localIP();
-  system_config.subnet_mask = WiFi.subnetMask();
+  system_state.local_ip = WiFi.localIP();
+  system_state.subnet_mask = WiFi.subnetMask();
 
   printf("i: Connected to %s\n", WIFI_SSID);
   printf("v: MAC address: %s\n", WiFi.macAddress().c_str());
-  printf("v: IP address: %s\n", system_config.local_ip.toString().c_str());
-  printf("v: Subnet mask: %s\n", system_config.subnet_mask.toString().c_str());
+  printf("v: IP address: %s\n", system_state.local_ip.toString().c_str());
+  printf("v: Subnet mask: %s\n", system_state.subnet_mask.toString().c_str());
 
   udp.begin(CLIENT_UDP_PORT);
   printf("i: UDP listening port: %u\n", CLIENT_UDP_PORT);
@@ -168,8 +184,8 @@ static void action_handshake()
     rc = pb_encode(&stream, WirelessClientMessage_fields, &msg);
     assert(rc);
     // Broadcast probe via UDP.
-    rc = udp.beginPacket(helper_get_broadcast_address(static_cast<uint32_t>(system_config.local_ip),
-                                                      static_cast<uint32_t>(system_config.subnet_mask)),
+    rc = udp.beginPacket(helper_get_broadcast_address(static_cast<uint32_t>(system_state.local_ip),
+                                                      static_cast<uint32_t>(system_state.subnet_mask)),
                          HOST_UDP_PORT);
     assert(rc);
     rc = udp.write(msg_buffer, stream.bytes_written);
@@ -197,16 +213,16 @@ static void action_handshake()
     if (rc && response.type == WirelessHostMessage_Type_HANDSHAKE_ASSIGNMENT)
     {
       // HACK: We need to reverse the endianness of local IP to match that of received IP.
-      std::uint32_t reversed_local_ip = helper_reverse_bytes(static_cast<std::uint32_t>(system_config.local_ip));
+      std::uint32_t reversed_local_ip = helper_reverse_bytes(static_cast<std::uint32_t>(system_state.local_ip));
       if (response.content.assignment.address_ipv4 == reversed_local_ip)
       {
         // Assignment answered.
-        system_config.host_ip = udp.remoteIP();
-        system_config.id = response.content.assignment.id;
+        system_state.host_ip = udp.remoteIP();
+        system_state.id = response.content.assignment.id;
 
         printf("v: Got handshake assignment from Host.\n");
-        printf("i: Assigned ID: %d\n", system_config.id);
-        printf("v: Host: %s\n", system_config.host_ip.toString().c_str());
+        printf("i: Assigned ID: %d\n", system_state.id);
+        printf("v: Host: %s\n", system_state.host_ip.toString().c_str());
         break;
       }
       else
@@ -231,15 +247,15 @@ static void action_handshake()
     WirelessClientMessage confirmation{};
     confirmation.type = WirelessClientMessage_Type_HANDSHAKE_ASSIGNMENT_CONFIRMATION;
     confirmation.which_content = WirelessClientMessage_assignment_tag;
-    confirmation.content.assignment.address_ipv4 = static_cast<uint32_t>(system_config.local_ip);
-    confirmation.content.assignment.id = system_config.id;
+    confirmation.content.assignment.address_ipv4 = static_cast<uint32_t>(system_state.local_ip);
+    confirmation.content.assignment.id = system_state.id;
     std::uint8_t confirmation_buffer[BUFFER_SIZE];
     auto confirmation_stream = pb_ostream_from_buffer(confirmation_buffer, sizeof(confirmation_buffer));
     rc = pb_encode(&confirmation_stream, WirelessClientMessage_fields, &confirmation);
     assert(rc);
 
     // Send the confirmation.
-    rc = udp.beginPacket(system_config.host_ip, HOST_UDP_PORT);
+    rc = udp.beginPacket(system_state.host_ip, HOST_UDP_PORT);
     assert(rc);
     rc = udp.write(confirmation_buffer, confirmation_stream.bytes_written);
     assert(rc == confirmation_stream.bytes_written);
@@ -251,7 +267,7 @@ static void action_handshake()
   {
     // Establish persistent TCP connection.
     printf("i: Establishing TCP connection...\n");
-    while (!client.connect(system_config.host_ip, HOST_TCP_PORT, 200))
+    while (!client.connect(system_state.host_ip, HOST_TCP_PORT, 200))
     {
       taskYIELD();
     }
@@ -292,6 +308,7 @@ static void action_pong()
   // Send message.
   x_rc = xQueueSendToBack(outgoing_queue_handle, &pong_msg, portMAX_DELAY);
   assert(x_rc == pdTRUE);
+  printf("v: Responding to Ping message.\n");
 }
 
 /* == TASKS (THREAD ENTRY POINTS) == */
@@ -312,7 +329,6 @@ static void task_wifi_read(void *_)
       taskYIELD();
     }
 
-    printf("i: Decoding incoming packet...\n");
     // Read the packet.
     std::uint8_t buffer[BUFFER_SIZE];
     uint8_t packetSize = client.readBytes(buffer, sizeof(buffer));
@@ -330,7 +346,11 @@ static void task_wifi_read(void *_)
     x_rc = xQueueSendToBack(incoming_queue_handle, &msg, portMAX_DELAY);
     if (x_rc != pdPASS)
     {
-      printf("w: Packet emplacement failed. Packet dropped.\n");
+      printf("w: Incoming message emplacement failed.\n");
+    }
+    else
+    {
+      printf("v: Incoming message enqueued.\n");
     }
   }
 }
@@ -349,7 +369,6 @@ static void task_wifi_send(void *_)
     WirelessClientMessage msg{};
     x_rc = xQueueReceive(outgoing_queue_handle, &msg, portMAX_DELAY);
     assert(x_rc == pdPASS);
-    printf("i: Sending outgoing packet...\n");
 
     // Encode the message.
     std::uint8_t buffer[BUFFER_SIZE];
@@ -360,6 +379,8 @@ static void task_wifi_send(void *_)
     // Send the message.
     rc = client.write(buffer, stream.bytes_written);
     assert(rc == stream.bytes_written);
+
+    printf("v: Outgoing message sent.\n");
   }
 }
 
@@ -388,6 +409,34 @@ static void task_message_processor(void *_)
     }
   }
 }
+
+/**
+ * \brief Button press detection with debounce.
+ */
+static void task_button_debounced(void *_)
+{
+  // std::uint32_t rc = 0; // The return code.
+  BaseType_t x_rc;      // The BaseType_t return code.
+
+  while (true)
+  {
+    if (!system_state.main_button_irq_issued)
+    {
+      taskYIELD(); // Wait for the button to be pressed.
+    }
+
+    WirelessClientMessage outgoing_msg{};
+    outgoing_msg.type = WirelessClientMessage_Type_ARBITRATION_REQUEST;
+    x_rc = xQueueSendToBack(outgoing_queue_handle, &outgoing_msg, portMAX_DELAY);
+    assert(x_rc == pdPASS);
+
+    system_state.main_button_irq_issued = false;
+    
+    printf("v: Main button pressed.\n");
+    delay(100);
+  }
+}
+
 /* == MAIN == */
 
 void setup()
@@ -428,6 +477,13 @@ void setup()
                                  app_cpu);
   assert(x_rc == pdPASS);
   assert(task_message_processor_handle);
+  x_rc = xTaskCreatePinnedToCore(task_button_debounced,
+                                 "button_debounced",
+                                 2048,
+                                 nullptr,
+                                 1,
+                                 &task_button_debounced_handle,
+                                 app_cpu);
 
   // Indicate that we have finished initialization.
   digitalWrite(GPIO_ONBOARD_LED, LOW);

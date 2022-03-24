@@ -1,9 +1,15 @@
 {
 	"folders": [
 		{
+			"name": "arbiter-client",
 			"path": "arbiter-client"
 		},
 		{
+			"name": "arbiter-host",
+			"path": "arbiter-host"
+		},
+		{
+			"name": "tool-server",
 			"path": "tool-server"
 		}
 	],
@@ -49,6 +55,9 @@
 			"cinttypes": "cpp",
 			"utility": "cpp",
 			"typeinfo": "cpp"
-		}
+		},
+		"cSpell.words": [
+			"GPIO"
+		]
 	}
 }
